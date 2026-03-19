@@ -149,7 +149,6 @@ def add_paper(
         """,
         (arxiv_id, title, authors, abstract, url, published),
     )
-    conn.commit()
     return True
 
 
@@ -187,11 +186,12 @@ def list_papers(
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    order = "p.added_at DESC"
-    if sort == "date":
-        order = "p.published DESC"
-    elif sort == "title":
-        order = "p.title ASC"
+    _ORDER_MAP = {
+        "added": "p.added_at DESC",
+        "date": "p.published DESC",
+        "title": "p.title ASC",
+    }
+    order = _ORDER_MAP.get(sort, "p.added_at DESC")
 
     params.append(limit)
     return conn.execute(
@@ -211,7 +211,6 @@ def list_papers(
 def update_memo(conn: sqlite3.Connection, arxiv_id: str, memo: str) -> None:
     """メモを更新する。"""
     conn.execute("UPDATE papers SET memo = ? WHERE id = ?", (memo, arxiv_id))
-    conn.commit()
 
 
 def mark_read(conn: sqlite3.Connection, arxiv_id: str) -> None:
@@ -220,7 +219,6 @@ def mark_read(conn: sqlite3.Connection, arxiv_id: str) -> None:
         "UPDATE papers SET read_at = datetime('now') WHERE id = ?",
         (arxiv_id,),
     )
-    conn.commit()
 
 
 def add_tag(conn: sqlite3.Connection, arxiv_id: str, tag: str) -> None:
@@ -229,7 +227,6 @@ def add_tag(conn: sqlite3.Connection, arxiv_id: str, tag: str) -> None:
         "INSERT OR IGNORE INTO tags (paper_id, tag) VALUES (?, ?)",
         (arxiv_id, tag),
     )
-    conn.commit()
 
 
 def remove_tag(conn: sqlite3.Connection, arxiv_id: str, tag: str) -> bool:
@@ -238,7 +235,6 @@ def remove_tag(conn: sqlite3.Connection, arxiv_id: str, tag: str) -> bool:
         "DELETE FROM tags WHERE paper_id = ? AND tag = ?",
         (arxiv_id, tag),
     )
-    conn.commit()
     return cursor.rowcount > 0
 
 
@@ -279,7 +275,6 @@ def add_feed(conn: sqlite3.Connection, name: str, url: str) -> bool:
     if existing:
         return False
     conn.execute("INSERT INTO rss_feeds (name, url) VALUES (?, ?)", (name, url))
-    conn.commit()
     return True
 
 
@@ -294,4 +289,3 @@ def update_feed_fetched(conn: sqlite3.Connection, feed_id: int) -> None:
         "UPDATE rss_feeds SET last_fetched = datetime('now') WHERE id = ?",
         (feed_id,),
     )
-    conn.commit()

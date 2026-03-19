@@ -5,7 +5,7 @@ arXiv論文をローカルで管理するPython製CLIツール。
 ## インストール
 
 ```bash
-pip install -e .
+uv sync
 ```
 
 ## 使い方
@@ -52,5 +52,5 @@ arx rss fetch
 ## テスト
 
 ```bash
-pytest
+uv run pytest
 ```

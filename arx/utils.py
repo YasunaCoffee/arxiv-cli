@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 # arXiv IDのパターン（新旧両形式）
 _ARXIV_ID_PATTERN = re.compile(
-    r"(?:arxiv[:/])?(\d{4}\.\d{4,5}(?:v\d+)?|[a-z\-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?)",
+    r"(?:arxiv[:/])?(\d{4}\.\d{4,5}(?:v\d+)?|[a-zA-Z\-]+(?:\.[a-zA-Z]{2})?/\d{7}(?:v\d+)?)",
     re.IGNORECASE,
 )
 

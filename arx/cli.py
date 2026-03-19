@@ -404,30 +404,34 @@ def rss_list() -> None:
 @rss_app.command(name="fetch")
 def rss_fetch() -> None:
     """全RSSフィードを取得して新着論文を追加する。"""
+    import time
+
     from arx.db import list_feeds, add_paper, update_feed_fetched
     from arx.api import fetch_rss
 
     with _get_conn() as conn:
         feeds = list_feeds(conn)
 
-    if not feeds:
-        console.print("[dim]登録済みフィードはありません。arx rss add で登録してください。[/]")
-        return
+        if not feeds:
+            console.print("[dim]登録済みフィードはありません。arx rss add で登録してください。[/]")
+            return
 
-    total_added = 0
-    total_skipped = 0
+        total_added = 0
+        total_skipped = 0
 
-    for feed in feeds:
-        console.print(f"[cyan]取得中:[/] {feed['name']} ...")
+        for i, feed in enumerate(feeds):
+            if i > 0:
+                time.sleep(3)  # arXivレートリミット遵守
 
-        try:
-            papers = fetch_rss(feed["url"])
-        except (RuntimeError, ValueError) as e:
-            err_console.print(f"[bold red]エラー ({feed['name']}):[/] {e}")
-            continue
+            console.print(f"[cyan]取得中:[/] {feed['name']} ...")
 
-        added_count = 0
-        with _get_conn() as conn:
+            try:
+                papers = fetch_rss(feed["url"])
+            except (RuntimeError, ValueError) as e:
+                err_console.print(f"[bold red]エラー ({feed['name']}):[/] {e}")
+                continue
+
+            added_count = 0
             for meta in papers:
                 added = add_paper(
                     conn,
@@ -445,10 +449,10 @@ def rss_fetch() -> None:
 
             update_feed_fetched(conn, feed["id"])
 
-        total_added += added_count
-        console.print(f"  {added_count}件追加 ({len(papers) - added_count}件スキップ)")
+            total_added += added_count
+            console.print(f"  {added_count}件追加 ({len(papers) - added_count}件スキップ)")
 
-    console.print(f"\n[green]完了:[/] 合計 {total_added}件追加、{total_skipped}件スキップ")
+        console.print(f"\n[green]完了:[/] 合計 {total_added}件追加、{total_skipped}件スキップ")
 
 
 # --- バージョン ---

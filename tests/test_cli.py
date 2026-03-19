@@ -262,9 +262,44 @@ class TestRssCommands:
     def test_rss_list(self, patched_conn):
         from arx.db import add_feed
         add_feed(patched_conn, "cs.AI", "https://arxiv.org/rss/cs.AI")
+        patched_conn.commit()
         result = runner.invoke(app, ["rss", "list"])
         assert result.exit_code == 0
         assert "cs.AI" in result.output
+
+    @patch("time.sleep")
+    @patch("arx.api.httpx.Client")
+    def test_rss_fetch_e2e(self, mock_client_class, mock_sleep, patched_conn):
+        """フィード登録→fetch→論文追加のE2Eテスト。"""
+        from arx.db import add_feed, get_paper
+        add_feed(patched_conn, "cs.AI", "https://arxiv.org/rss/cs.AI")
+        patched_conn.commit()
+
+        rss_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>cs.AI</title>
+<item>
+  <title>Test Paper From RSS</title>
+  <link>https://arxiv.org/abs/2401.00001</link>
+  <description>An RSS paper abstract.</description>
+</item>
+</channel></rss>"""
+
+        mock_response = MagicMock()
+        mock_response.text = rss_xml
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.get = MagicMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client
+
+        result = runner.invoke(app, ["rss", "fetch"])
+        assert result.exit_code == 0
+        assert "1件追加" in result.output
+
+        paper = get_paper(patched_conn, "2401.00001")
+        assert paper is not None
+        assert paper["title"] == "Test Paper From RSS"
 
 
 class TestVersionCommand:
@@ -285,3 +320,24 @@ class TestUrlParsing:
         from arx.utils import extract_arxiv_id
         arxiv_id = extract_arxiv_id("https://arxiv.org/pdf/2303.08774.pdf")
         assert arxiv_id == "2303.08774"
+
+    def test_old_format_id(self):
+        from arx.utils import extract_arxiv_id
+        assert extract_arxiv_id("hep-th/0001001") == "hep-th/0001001"
+
+    def test_old_format_id_with_subcategory(self):
+        from arx.utils import extract_arxiv_id
+        assert extract_arxiv_id("math.AG/0601001") == "math.AG/0601001"
+
+    def test_old_format_url(self):
+        from arx.utils import extract_arxiv_id
+        result = extract_arxiv_id("https://arxiv.org/abs/hep-th/0001001")
+        assert result == "hep-th/0001001"
+
+    def test_old_format_with_version(self):
+        from arx.utils import extract_arxiv_id
+        assert extract_arxiv_id("hep-th/0001001v2") == "hep-th/0001001"
+
+    def test_arxiv_prefix(self):
+        from arx.utils import extract_arxiv_id
+        assert extract_arxiv_id("arxiv:2303.08774") == "2303.08774"

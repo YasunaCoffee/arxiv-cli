@@ -36,7 +36,7 @@ def fetch_paper(arxiv_id: str) -> PaperMeta:
     url = f"{_ARXIV_API_BASE}?id_list={arxiv_id}&max_results=1"
 
     try:
-        with httpx.Client(verify=True, timeout=10) as client:
+        with httpx.Client(verify=True, timeout=10, follow_redirects=True) as client:
             response = client.get(url)
             response.raise_for_status()
     except httpx.TimeoutException:
@@ -115,7 +115,7 @@ def fetch_rss(feed_url: str) -> list[PaperMeta]:
         raise ValueError(f"安全でないURLです: {feed_url}")
 
     try:
-        with httpx.Client(verify=True, timeout=10) as client:
+        with httpx.Client(verify=True, timeout=10, follow_redirects=True) as client:
             response = client.get(feed_url)
             response.raise_for_status()
     except httpx.TimeoutException:

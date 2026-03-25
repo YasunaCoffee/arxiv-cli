@@ -5,7 +5,6 @@ Usage:
     python scripts/fetch_ai_character.py   # JSON形式で保存した論文を出力
 """
 
-import asyncio
 import json
 import sys
 import time
@@ -19,11 +18,12 @@ from arx.utils import extract_arxiv_id, is_safe_url
 _ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query"
 _NS = {"atom": "http://www.w3.org/2005/Atom"}
 
-# AIキャラクター関連の検索クエリ（arXiv API構文）
+# AIキャラクターの性格・思想・対話に関する検索クエリ（arXiv API構文）
 _QUERIES = [
-    'all:"AI character" AND submittedDate:[20250101 TO 20251231]',
-    'all:"character generation" AND all:"generative model" AND submittedDate:[20250101 TO 20251231]',
-    'all:"anime character" OR all:"virtual character" AND submittedDate:[20250101 TO 20251231]',
+    'all:"character persona" AND all:"large language model" AND submittedDate:[20250101 TO 20251231]',
+    'all:"AI companion" AND all:"dialogue" AND submittedDate:[20250101 TO 20251231]',
+    'all:"role-playing" AND all:"LLM" AND submittedDate:[20250101 TO 20251231]',
+    'all:"personality" AND all:"conversational agent" AND submittedDate:[20250101 TO 20251231]',
 ]
 _LIMIT = 5
 

@@ -50,6 +50,7 @@ def main() -> None:
                     "id": meta.arxiv_id,
                     "title": meta.title,
                     "authors": meta.authors,
+                    "abstract": meta.abstract,
                     "url": meta.url,
                     "published": meta.published,
                     "status": "added",

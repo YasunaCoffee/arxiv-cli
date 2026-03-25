@@ -116,6 +116,7 @@ def save_papers(papers: list[dict]) -> list[dict]:
             "id": p["arxiv_id"],
             "title": p["title"],
             "authors": p["authors"],
+            "abstract": p["abstract"],
             "url": p["url"],
             "published": p["published"],
             "status": status,

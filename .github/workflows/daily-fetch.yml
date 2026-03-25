@@ -2,7 +2,7 @@ name: Daily arXiv Fetch
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 毎日 JST 15:00
+    - cron: '0 3 * * *'  # 毎日 JST 12:00
   workflow_dispatch:
 
 jobs:
@@ -18,13 +18,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Install arx
         run: pip install -e .
 
-      - name: Fetch RSS feeds
-        run: arx rss fetch
+      # AlphaXiv MCPで2025年のAIキャラクター論文を取得 → DBに保存 → Discord通知
+      - name: Fetch & Notify
+        run: python scripts/fetch_ai_character.py | python scripts/notify_discord.py
         env:
           ARX_DB_PATH: ./data/papers.db
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Commit updated DB
         run: |

@@ -15,7 +15,12 @@ WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 
 
 def main() -> None:
-    papers = json.loads(sys.stdin.read())
+    raw = sys.stdin.read().strip()
+    if not raw:
+        print("入力が空のため通知スキップ")
+        return
+
+    papers = json.loads(raw)
 
     if not papers:
         print("通知対象なし、スキップ")

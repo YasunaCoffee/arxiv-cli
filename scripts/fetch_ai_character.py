@@ -11,7 +11,7 @@ import re
 import sys
 
 from mcp import ClientSession
-from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 
 from arx.api import fetch_paper
 from arx.db import add_paper, get_connection
@@ -24,16 +24,13 @@ _QUERY = (
     "with controllable appearance, personality, and behavior using generative models."
 )
 
+_ALPHAXIV_MCP_URL = "https://api.alphaxiv.org/mcp/v1"
 _LIMIT = 5
 
 
 async def search_alphaxiv(query: str) -> list[str]:
     """AlphaXiv MCPのembedding_similarity_searchを呼び出してarXiv IDリストを返す。"""
-    params = StdioServerParameters(
-        command="uvx",
-        args=["alphaxiv-mcp"],
-    )
-    async with stdio_client(params) as (read, write):
+    async with streamablehttp_client(_ALPHAXIV_MCP_URL) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(

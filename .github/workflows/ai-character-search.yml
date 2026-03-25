@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YasunaCoffee/arxiv-data
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ github.token }}
           path: arxiv-data
 
       - uses: actions/setup-python@v5

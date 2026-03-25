@@ -11,10 +11,14 @@ import sys
 
 import httpx
 
-WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
+WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 
 
 def main() -> None:
+    if not WEBHOOK_URL:
+        print("DISCORD_WEBHOOK_URL が未設定のためスキップ")
+        return
+
     raw = sys.stdin.read().strip()
     if not raw:
         print("入力が空のため通知スキップ")

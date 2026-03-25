@@ -1,12 +1,12 @@
-name: Daily RSS Fetch
+name: Daily AI Character Search
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # 毎日 JST 7:00
+    - cron: '0 3 * * *'  # 毎日 JST 12:00
   workflow_dispatch:
 
 jobs:
-  fetch:
+  search:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,13 +21,13 @@ jobs:
       - name: Install arx
         run: pip install -e .
 
-      - name: Fetch RSS papers
-        run: python scripts/fetch_rss_papers.py > /tmp/rss_papers.json
+      - name: Fetch AI character papers
+        run: python scripts/fetch_ai_character.py > /tmp/ai_papers.json
         env:
           ARX_DB_PATH: ./data/papers.db
 
       - name: Notify Discord
-        run: python scripts/notify_discord.py < /tmp/rss_papers.json
+        run: python scripts/notify_discord.py < /tmp/ai_papers.json
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
@@ -36,4 +36,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f data/papers.db ] && git add data/papers.db || echo "data/papers.db not found, skipping"
-          git diff --cached --quiet || (git commit -m "chore: rss fetch $(date +%Y-%m-%d)" && git push)
+          git diff --cached --quiet || (git commit -m "chore: ai-character fetch $(date +%Y-%m-%d)" && git push)

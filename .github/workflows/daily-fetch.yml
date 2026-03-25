@@ -1,0 +1,35 @@
+name: Daily arXiv Fetch
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 毎日 JST 15:00
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install arx
+        run: pip install -e .
+
+      - name: Fetch RSS feeds
+        run: arx rss fetch
+        env:
+          ARX_DB_PATH: ./data/papers.db
+
+      - name: Commit updated DB
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/papers.db
+          git diff --cached --quiet || git commit -m "chore: daily fetch $(date +%Y-%m-%d)"
+          git push

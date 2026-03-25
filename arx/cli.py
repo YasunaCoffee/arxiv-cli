@@ -472,5 +472,13 @@ def main(
     """arXiv論文管理CLIツール"""
 
 
+@app.command()
+def mcp() -> None:
+    """MCPサーバーとして起動する（Claude Desktop等のAIエージェントと連携）。"""
+    from arx.mcp_server import serve
+
+    serve()
+
+
 if __name__ == "__main__":
     app()

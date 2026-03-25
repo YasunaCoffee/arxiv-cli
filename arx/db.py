@@ -6,7 +6,10 @@ from pathlib import Path
 
 
 def get_db_path() -> Path:
-    """DBファイルのパスを返す。"""
+    """DBファイルのパスを返す。ARX_DB_PATH環境変数で上書き可能。"""
+    env = os.environ.get("ARX_DB_PATH")
+    if env:
+        return Path(env)
     return Path.home() / ".arx" / "papers.db"
 
 

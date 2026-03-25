@@ -8,11 +8,16 @@ on:
 jobs:
   search:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout arxiv-data
+        uses: actions/checkout@v4
+        with:
+          repository: YasunaCoffee/arxiv-data
+          token: ${{ secrets.GH_PAT }}
+          path: arxiv-data
 
       - uses: actions/setup-python@v5
         with:
@@ -24,7 +29,7 @@ jobs:
       - name: Fetch AI character papers
         run: python scripts/fetch_ai_character.py > /tmp/ai_papers.json
         env:
-          ARX_DB_PATH: ./data/papers.db
+          ARX_DB_PATH: ./arxiv-data/papers.db
 
       - name: Notify Discord
         run: python scripts/notify_discord.py < /tmp/ai_papers.json
@@ -32,9 +37,10 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Commit updated DB
+      - name: Push updated DB to arxiv-data
         run: |
+          cd arxiv-data
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f data/papers.db ] && git add data/papers.db || echo "data/papers.db not found, skipping"
+          git add papers.db
           git diff --cached --quiet || (git commit -m "chore: ai-character fetch $(date +%Y-%m-%d)" && git push)

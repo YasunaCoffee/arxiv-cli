@@ -21,17 +21,29 @@ jobs:
       - name: Install arx
         run: pip install -e .
 
-      # AlphaXiv MCPで2025年のAIキャラクター論文を取得 → DBに保存 → Discord通知
-      - name: Fetch papers
-        run: python scripts/fetch_ai_character.py > /tmp/papers.json
+      # --- RSS新着論文 ---
+      - name: Fetch RSS papers
+        run: python scripts/fetch_rss_papers.py > /tmp/rss_papers.json
         env:
           ARX_DB_PATH: ./data/papers.db
 
-      - name: Notify Discord
-        run: python scripts/notify_discord.py < /tmp/papers.json
+      - name: Notify RSS papers
+        run: python scripts/notify_discord.py < /tmp/rss_papers.json
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
+      # --- AIキャラクター論文検索 ---
+      - name: Fetch AI character papers
+        run: python scripts/fetch_ai_character.py > /tmp/ai_papers.json
+        env:
+          ARX_DB_PATH: ./data/papers.db
+
+      - name: Notify AI character papers
+        run: python scripts/notify_discord.py < /tmp/ai_papers.json
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      # --- DB保存 ---
       - name: Commit updated DB
         run: |
           git config user.name "github-actions[bot]"

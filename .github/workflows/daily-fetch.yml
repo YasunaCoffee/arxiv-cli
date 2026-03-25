@@ -2,7 +2,7 @@ name: Daily arXiv Fetch
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 毎日 JST 15:00
+    - cron: '0 3 * * *'  # 毎日 JST 12:00
   workflow_dispatch:
 
 jobs:
@@ -25,6 +25,13 @@ jobs:
         run: arx rss fetch
         env:
           ARX_DB_PATH: ./data/papers.db
+
+      - name: Notify Discord
+        run: python scripts/notify_discord.py
+        env:
+          ARX_DB_PATH: ./data/papers.db
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NOTIFY_LIMIT: '5'
 
       - name: Commit updated DB
         run: |

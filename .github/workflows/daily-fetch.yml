@@ -32,6 +32,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/papers.db
-          git diff --cached --quiet || git commit -m "chore: daily fetch $(date +%Y-%m-%d)"
-          git push
+          [ -f data/papers.db ] && git add data/papers.db || echo "data/papers.db not found, skipping"
+          git diff --cached --quiet || (git commit -m "chore: daily fetch $(date +%Y-%m-%d)" && git push)

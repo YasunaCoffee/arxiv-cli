@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AlphaXiv MCPで2025年のAIキャラクター関連論文を取得してDBに保存する。
+"""arXiv APIで2025年のAIキャラクター関連論文を取得してDBに保存する。
 
 Usage:
     python scripts/fetch_ai_character.py   # JSON形式で保存した論文を出力
@@ -7,107 +7,136 @@ Usage:
 
 import asyncio
 import json
-import re
 import sys
+import time
+import xml.etree.ElementTree as ET
 
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+import httpx
 
-from arx.api import fetch_paper
 from arx.db import add_paper, get_connection
+from arx.utils import extract_arxiv_id, is_safe_url
 
-# AlphaXivのembedding_similarity_searchに渡すクエリ
-# 複数の観点を含む2〜3文で書くと精度が上がる（AlphaXivの推奨）
-_QUERY = (
-    "AI character generation and virtual character synthesis using deep learning. "
-    "Methods for generating anime characters, game characters, or digital humans "
-    "with controllable appearance, personality, and behavior using generative models."
-)
+_ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query"
+_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
-_ALPHAXIV_MCP_URL = "https://api.alphaxiv.org/mcp/v1"
+# AIキャラクター関連の検索クエリ（arXiv API構文）
+_QUERIES = [
+    'all:"AI character" AND submittedDate:[20250101 TO 20251231]',
+    'all:"character generation" AND all:"generative model" AND submittedDate:[20250101 TO 20251231]',
+    'all:"anime character" OR all:"virtual character" AND submittedDate:[20250101 TO 20251231]',
+]
 _LIMIT = 5
 
 
-async def search_alphaxiv(query: str) -> list[str]:
-    """AlphaXiv MCPのembedding_similarity_searchを呼び出してarXiv IDリストを返す。"""
-    async with streamablehttp_client(_ALPHAXIV_MCP_URL) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "embedding_similarity_search",
-                arguments={"query": query},
-            )
+def search_arxiv(query: str, max_results: int = 10) -> list[dict]:
+    """arXiv APIで論文を検索してメタデータのリストを返す。"""
+    params = {
+        "search_query": query,
+        "max_results": max_results,
+        "sortBy": "relevance",
+        "sortOrder": "descending",
+    }
+    resp = httpx.get(_ARXIV_SEARCH_URL, params=params, verify=True, timeout=15)
+    resp.raise_for_status()
+    time.sleep(3)  # arXiv レートリミット遵守
 
-    # 結果テキストからarXiv IDを抽出
-    text = ""
-    for content in result.content:
-        if hasattr(content, "text"):
-            text += content.text
-
-    # arXiv IDパターン: 2501.12345 形式
-    ids = re.findall(r"\b(2[0-9]{3}\.\d{4,5})\b", text)
-    # 2025年論文のみ (25xx.xxxxx)
-    ids_2025 = [i for i in ids if i.startswith("25")]
-    # 重複除去・順序保持
-    seen = set()
-    unique = []
-    for i in ids_2025:
-        if i not in seen:
-            seen.add(i)
-            unique.append(i)
-    return unique[:_LIMIT]
-
-
-def save_papers(arxiv_ids: list[str]) -> list[dict]:
-    """arXiv APIで論文メタデータを取得してDBに保存する。保存した論文の情報を返す。"""
-    saved = []
-    for arxiv_id in arxiv_ids:
-        try:
-            meta = fetch_paper(arxiv_id)
-        except RuntimeError as e:
-            print(f"[skip] {arxiv_id}: {e}", file=sys.stderr)
+    root = ET.fromstring(resp.text)
+    results = []
+    for entry in root.findall("atom:entry", _NS):
+        # arXiv IDを取得
+        id_url = entry.findtext("atom:id", default="", namespaces=_NS)
+        arxiv_id = extract_arxiv_id(id_url)
+        if not arxiv_id:
             continue
 
+        title = (entry.findtext("atom:title", default="", namespaces=_NS) or "").strip().replace("\n", " ")
+        abstract = (entry.findtext("atom:summary", default="", namespaces=_NS) or "").strip()
+        published = (entry.findtext("atom:published", default="", namespaces=_NS) or "")[:10]
+        authors = ", ".join(
+            (a.findtext("atom:name", default="", namespaces=_NS) or "")
+            for a in entry.findall("atom:author", _NS)
+        )
+        url = f"https://arxiv.org/abs/{arxiv_id}"
+        for link in entry.findall("atom:link", _NS):
+            if link.get("rel") == "alternate":
+                href = link.get("href", "")
+                if is_safe_url(href):
+                    url = href
+
+        results.append({
+            "arxiv_id": arxiv_id,
+            "title": title,
+            "authors": authors,
+            "abstract": abstract,
+            "url": url,
+            "published": published,
+        })
+    return results
+
+
+def fetch_papers() -> list[dict]:
+    """複数クエリで検索し、重複除去して上位 _LIMIT 件を返す。"""
+    seen = set()
+    all_results = []
+
+    for query in _QUERIES:
+        try:
+            results = search_arxiv(query, max_results=10)
+        except Exception as e:
+            print(f"[warn] 検索失敗: {e}", file=sys.stderr)
+            continue
+
+        for r in results:
+            if r["arxiv_id"] not in seen:
+                seen.add(r["arxiv_id"])
+                all_results.append(r)
+
+        if len(all_results) >= _LIMIT:
+            break
+
+    return all_results[:_LIMIT]
+
+
+def save_papers(papers: list[dict]) -> list[dict]:
+    """DBに保存して結果リストを返す。"""
+    saved = []
+    for p in papers:
         with get_connection() as conn:
             added = add_paper(
                 conn,
-                meta.arxiv_id,
-                meta.title,
-                meta.authors,
-                meta.abstract,
-                meta.url,
-                meta.published,
+                p["arxiv_id"],
+                p["title"],
+                p["authors"],
+                p["abstract"],
+                p["url"],
+                p["published"],
             )
-
         status = "added" if added else "already_exists"
         saved.append({
-            "id": meta.arxiv_id,
-            "title": meta.title,
-            "authors": meta.authors,
-            "url": meta.url,
-            "published": meta.published,
+            "id": p["arxiv_id"],
+            "title": p["title"],
+            "authors": p["authors"],
+            "url": p["url"],
+            "published": p["published"],
             "status": status,
         })
-        print(f"[{status}] {meta.arxiv_id}: {meta.title[:60]}", file=sys.stderr)
-
+        print(f"[{status}] {p['arxiv_id']}: {p['title'][:60]}", file=sys.stderr)
     return saved
 
 
-async def main() -> None:
-    print("AlphaXiv MCPで検索中...", file=sys.stderr)
-    arxiv_ids = await search_alphaxiv(_QUERY)
+def main() -> None:
+    print("arXiv APIで検索中...", file=sys.stderr)
+    papers = fetch_papers()
 
-    if not arxiv_ids:
+    if not papers:
         print("論文が見つかりませんでした", file=sys.stderr)
         print(json.dumps([]))
         return
 
-    print(f"{len(arxiv_ids)}件取得、DBに保存中...", file=sys.stderr)
-    papers = save_papers(arxiv_ids)
-
-    # 結果をJSONで標準出力（notify_discord.pyが受け取る）
-    print(json.dumps(papers, ensure_ascii=False))
+    print(f"{len(papers)}件取得、DBに保存中...", file=sys.stderr)
+    saved = save_papers(papers)
+    print(json.dumps(saved, ensure_ascii=False))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

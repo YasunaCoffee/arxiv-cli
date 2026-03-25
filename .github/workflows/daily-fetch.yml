@@ -22,10 +22,14 @@ jobs:
         run: pip install -e .
 
       # AlphaXiv MCPで2025年のAIキャラクター論文を取得 → DBに保存 → Discord通知
-      - name: Fetch & Notify
-        run: python scripts/fetch_ai_character.py | python scripts/notify_discord.py
+      - name: Fetch papers
+        run: python scripts/fetch_ai_character.py > /tmp/papers.json
         env:
           ARX_DB_PATH: ./data/papers.db
+
+      - name: Notify Discord
+        run: python scripts/notify_discord.py < /tmp/papers.json
+        env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Commit updated DB
